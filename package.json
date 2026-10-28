@@ -1,0 +1,14 @@
+{
+  "name": "pi-session-correlation",
+  "version": "0.1.0",
+  "description": "pi extension: stamp session/turn/parent-session correlation headers onto model requests for a fronting proxy.",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/pi-ai": "file:/Users/jiacao/.bun/install/global/node_modules/@earendil-works/pi-ai",
+    "@earendil-works/pi-coding-agent": "file:/Users/jiacao/.bun/install/global/node_modules/@earendil-works/pi-coding-agent"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
