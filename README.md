@@ -21,27 +21,29 @@ Some of this pi can already emit: for `openai-responses` models it sets
 `session_id` / `x-client-request-id` from `options.sessionId` on every request, and
 `models.json` `compat` can turn the same on for `openai-completions`.
 
-**This extension is strictly necessary only for `x-pi-parent-state` and
-`x-pi-parent-session-id`** — the only values that exist nowhere else on the wire.
-`session-id` also reaches the proxy through the `models.json` session-affinity path, and
-turn boundaries, cwd, and message counts are all derivable from the request body the proxy
-already receives. So the fields this extension is *solely* responsible for are the parent
-ones; if it stops loading, those two go dark while session grouping survives. Worth
-knowing before anything treats them as guaranteed.
+**This extension is strictly necessary only for `x-pi-parent-state`,
+`x-pi-parent-session-id`, and `x-pi-run-id`** — the values that exist nowhere else on the
+wire. `session-id` also reaches the proxy through the `models.json` session-affinity path,
+though the RFC has that alias **disabled until independent attribution exists**; turn
+boundaries, cwd, and message counts are all derivable from the request body the proxy
+already receives. If this extension stops loading, the parent columns and the run key go
+dark while session grouping survives via `x-pi-session-id`. Worth knowing before anything
+treats them as guaranteed.
 
 ## Headers emitted
 
 | Header | Source | Notes |
 |---|---|---|
 | `x-pi-session-id` | `sessionManager.getSessionId()` | matches the id in the session file name |
-| `x-pi-turn-id` | `<session-id>:<turnIndex>` | **run-scoped** — the counter restarts on reload/resume, so this is stable within a process run only. The RFC prefers a session-entry-id key once confirmed workable. **Tool-loop granularity** — see caveat below |
+| `x-pi-turn-id` | `<session-id>:<run-id>:<turn-index>` | run-scoped, and the run id is what makes that join-safe — the counter restarts on reload/resume, so the key is unique per run by construction. **Tool-loop granularity** — see caveat below |
+| `x-pi-run-id` | per-process nonce, minted at extension load | **extension-only**; a reload re-imports the module and mints a new one |
 | `x-pi-turn-index` | `turn_start.turnIndex` | |
 | `x-pi-call-seq` | per-session counter | **advisory** — resets on extension reload, restart, or resume. The RFC dropped it as a persisted field (ordering is recoverable from `timestamp` + `requestId`); still emitted, nothing consumes it yet |
 | `x-pi-parent-state` | session header `parentSession` | **`root` or `child`, sent on every request** — absence means "no contract", so state is never inferred from a missing header |
 | `x-pi-parent-session-id` | session header `parentSession` | id recovered from the parent path; **sent for children only** |
 | `x-pi-cwd` | `ctx.cwd` / `sessionManager.getCwd()` | sent now, **not persisted yet** — `projectSlug` is a deferred follow-up in the RFC |
 | `x-pi-session-name` | `sessionManager.getSessionName()` | same — sent, persistence deferred |
-| `x-pi-harness` | constant `pi` | distinguishes pi traffic from other harnesses |
+| `x-pi-harness` | constant `pi` | **a declaration, not a proof** — the proxy records what the client asserted; it cannot independently verify the sender |
 
 Existing header keys are never overwritten, so an explicit `models.json` header still
 wins.
@@ -49,8 +51,9 @@ wins.
 ## Caveats worth knowing before you build on these
 
 - **`turnIndex` is pi turns, not human messages.** One assistant response that issues
-  tool calls starts another turn. If you need "one human message" granularity, that is
-  a different grain — name the column accordingly on the proxy side.
+  tool calls starts another turn. The run id makes the key unique per run, but it does not
+  change the granularity — if you need "one human message", that is a different grain and a
+  separate column on the proxy side.
 - **Do not infer parent state from a missing id.** `x-pi-parent-state` is sent on every
   request precisely so that "root", "no contract", and "header lost" stay distinguishable.
   A `child` always carries an id; if it cannot, the consumer demotes it to `unknown` rather

@@ -18,10 +18,18 @@
  *   so a value that cannot be represented is skipped rather than guessed.
  */
 
+import { randomUUID } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ProviderHeaders } from "@earendil-works/pi-ai";
 
 const PREFIX = "x-pi";
+
+/**
+ * Per-process nonce, generated once at extension load. It makes the run scope visible
+ * inside the turn key, so a run-scoped value is safe to join: the counter restarts on
+ * reload, restart, or resume, and a reload re-imports this module and mints a new id.
+ */
+const RUN_ID = randomUUID();
 
 /** HTTP header values must stay within visible ASCII. */
 const UNSAFE_VALUE_RE = /[^\x21-\x7e]/;
@@ -102,12 +110,12 @@ export default function (pi: ExtensionAPI) {
 
     put(headers, `${PREFIX}-session-id`, sessionId);
     put(headers, `${PREFIX}-harness`, "pi");
+    put(headers, `${PREFIX}-run-id`, RUN_ID);
 
-    // Run-scoped: pi's turn counter restarts on reload and on resume, so this value
-    // is only stable within a process run. The RFC prefers a session-entry-id key
-    // once that is confirmed workable; until then this is the counter form.
+    // Run-scoped by construction: <session-id>:<run-id>:<turn-index>. The run id is
+    // what makes this join-safe across reloads and resumes, per the RFC contract.
     if (entry) {
-      put(headers, `${PREFIX}-turn-id`, `${sessionId}:${entry.turnIndex}`);
+      put(headers, `${PREFIX}-turn-id`, `${sessionId}:${RUN_ID}:${entry.turnIndex}`);
       put(headers, `${PREFIX}-turn-index`, String(entry.turnIndex));
       put(headers, `${PREFIX}-call-seq`, String(entry.callSeq));
     }
