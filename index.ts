@@ -18,6 +18,7 @@
  *   so a value that cannot be represented is skipped rather than guessed.
  */
 
+import { createHash } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ProviderHeaders } from "@earendil-works/pi-ai";
 
@@ -30,6 +31,11 @@ const MAX_VALUE_LEN = 200;
 /**
  * Per-session counters. Keyed by session id rather than held in a module global
  * so concurrent sessions in one process cannot corrupt each other.
+ *
+ * BEST EFFORT. State lives in this process and a reload clears it: `/model`
+ * reloads extensions, and a session resumed or forked into a new process starts
+ * its counter again. Treat `x-pi-call-seq` as ordering within one process run,
+ * not as a durable sequence.
  */
 const state = new Map<string, { turnIndex: number; callSeq: number }>();
 
@@ -54,6 +60,23 @@ function put(headers: ProviderHeaders, name: string, value: string | undefined |
   if (UNSAFE_VALUE_RE.test(value)) return;
   if (headers[name] !== undefined) return;
   headers[name] = value;
+}
+
+/**
+ * Like `put`, but an oversized value becomes a stable hash instead of disappearing.
+ * Used for the project dimension, where dropping it is the worst option: absence
+ * already carries meaning elsewhere in this schema, so a silently missing cwd is
+ * indistinguishable from "not applicable". Hash the raw value so the dimension
+ * stays joinable even when it is no longer human-readable.
+ */
+function putStable(headers: ProviderHeaders, name: string, value: string | undefined | null): void {
+  if (!value) return;
+  if (headers[name] !== undefined) return;
+  if (value.length <= MAX_VALUE_LEN && !UNSAFE_VALUE_RE.test(value)) {
+    headers[name] = value;
+    return;
+  }
+  headers[name] = createHash("sha256").update(value).digest("hex").slice(0, 16);
 }
 
 /**
@@ -105,9 +128,9 @@ export default function (pi: ExtensionAPI) {
     const parentSession = sm.getHeader?.()?.parentSession;
     put(headers, `${PREFIX}-parent-session-id`, sessionIdFromPath(parentSession));
 
-    // Project attribution. Sent as a header so the proxy does not have to parse
-    // paths out of prompt text.
-    put(headers, `${PREFIX}-cwd`, ctx.cwd || sm.getCwd?.());
-    put(headers, `${PREFIX}-session-name`, sm.getSessionName?.());
+    // Project attribution. Hashed rather than dropped when a path is too long for
+    // a header value — deep worktree paths are exactly the ones that matter.
+    putStable(headers, `${PREFIX}-cwd`, ctx.cwd || sm.getCwd?.());
+    putStable(headers, `${PREFIX}-session-name`, sm.getSessionName?.());
   });
 }
