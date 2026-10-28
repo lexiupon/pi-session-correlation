@@ -5,9 +5,9 @@ fronting proxy (loopia) can attribute a call to its session, turn, and parent
 session **without re-deriving them from prompt text**.
 
 Companion RFC: `loopia/docs/rfcs/session-correlation-headers.md`. **Header names here
-are provisional until that RFC's identity contract lands** — it now defines precedence
-(operator literal > this extension > session-affinity fallback > ingest derivation), so
-changing names is cheap now and expensive once anything depends on them.
+are provisional until that RFC's wire contract lands.** The contract now assigns exactly
+one canonical name per field and resolves any same-name collision **on the client** — the
+proxy can only see the final value, so this extension is where collisions get decided.
 
 ## Why this exists
 
@@ -21,24 +21,26 @@ Some of this pi can already emit: for `openai-responses` models it sets
 `session_id` / `x-client-request-id` from `options.sessionId` on every request, and
 `models.json` `compat` can turn the same on for `openai-completions`.
 
-**This extension is only strictly necessary for `x-pi-session-id` and
-`x-pi-parent-session-id`** — the two values that exist nowhere else on the wire. Turn
-boundaries, cwd, and message counts are all derivable by the proxy from the request body
-it already receives. Emitting them here is the cheaper and cleaner route, not the only
-one: if this extension is ever disabled, those columns go null while `session-id` survives
-via the `models.json` path. Worth knowing before anything treats them as guaranteed.
+**This extension is strictly necessary only for `x-pi-parent-state` and
+`x-pi-parent-session-id`** — the only values that exist nowhere else on the wire.
+`session-id` also reaches the proxy through the `models.json` session-affinity path, and
+turn boundaries, cwd, and message counts are all derivable from the request body the proxy
+already receives. So the fields this extension is *solely* responsible for are the parent
+ones; if it stops loading, those two go dark while session grouping survives. Worth
+knowing before anything treats them as guaranteed.
 
 ## Headers emitted
 
 | Header | Source | Notes |
 |---|---|---|
 | `x-pi-session-id` | `sessionManager.getSessionId()` | matches the id in the session file name |
-| `x-pi-turn-id` | `<session-id>:<turnIndex>` | **tool-loop granularity** — see caveat below |
+| `x-pi-turn-id` | `<session-id>:<turnIndex>` | **run-scoped** — the counter restarts on reload/resume, so this is stable within a process run only. The RFC prefers a session-entry-id key once confirmed workable. **Tool-loop granularity** — see caveat below |
 | `x-pi-turn-index` | `turn_start.turnIndex` | |
 | `x-pi-call-seq` | per-session counter | **advisory** — resets on extension reload, restart, or resume. The RFC dropped it as a persisted field (ordering is recoverable from `timestamp` + `requestId`); still emitted, nothing consumes it yet |
-| `x-pi-parent-session-id` | session header `parentSession` | id recovered from the parent path; absent for root sessions |
-| `x-pi-cwd` | `ctx.cwd` / `sessionManager.getCwd()` | the project dimension; **sha256 prefix if the path is too long for a header** |
-| `x-pi-session-name` | `sessionManager.getSessionName()` | set via `/name` / `--name`; hashed on overflow |
+| `x-pi-parent-state` | session header `parentSession` | **`root` or `child`, sent on every request** — absence means "no contract", so state is never inferred from a missing header |
+| `x-pi-parent-session-id` | session header `parentSession` | id recovered from the parent path; **sent for children only** |
+| `x-pi-cwd` | `ctx.cwd` / `sessionManager.getCwd()` | sent now, **not persisted yet** — `projectSlug` is a deferred follow-up in the RFC |
+| `x-pi-session-name` | `sessionManager.getSessionName()` | same — sent, persistence deferred |
 | `x-pi-harness` | constant `pi` | distinguishes pi traffic from other harnesses |
 
 Existing header keys are never overwritten, so an explicit `models.json` header still
@@ -49,18 +51,15 @@ wins.
 - **`turnIndex` is pi turns, not human messages.** One assistant response that issues
   tool calls starts another turn. If you need "one human message" granularity, that is
   a different grain — name the column accordingly on the proxy side.
-- **Absence is meaningful.** A missing `x-pi-parent-session-id` means a root session.
-  The extension omits it rather than writing an empty value, so consumers must treat
-  absent as a real state (`usageSource`-style), not as zero.
-- **Values that cannot be represented are skipped, not guessed**, for the short identifier
-  fields.
-- **Oversized values are hashed, not dropped, where absence means something**
-  (`x-pi-cwd`, `x-pi-session-name`): beyond the 200-char cap or containing non-ASCII, they
-  become `sha256:<first 16 hex>` of the raw value. The marker is required by the RFC so
-  hashed values stay distinguishable from literal ones, and because a hash is not
-  reversible, the **proxy** owns the value-mapping table — pi cannot. Short identifier
-  fields are still skipped rather than mangled. Handler failures do not change the
-  provider response, so a dropped header degrades quietly either way.
+- **Do not infer parent state from a missing id.** `x-pi-parent-state` is sent on every
+  request precisely so that "root", "no contract", and "header lost" stay distinguishable.
+  A `child` always carries an id; if it cannot, the consumer demotes it to `unknown` rather
+  than inventing one.
+- **Unrepresentable values are not sent.** Beyond the 200-char cap, or containing
+  non-visible-ASCII, the field is omitted and reads null on the proxy side — hashing
+  oversized values is deferred along with `projectSlug`. Handler failures do not change the
+  provider response either, so a dropped header degrades quietly; that is what the RFC's
+  coverage signal is for.
 - **State is keyed per session id**, because one pi process can host several concurrent
   sessions (in-process subagents). A module-global counter would mix them. It is also
   in-memory, so `callSeq` restarts after a reload, restart, or resume.
@@ -82,5 +81,7 @@ restart) to reload.
 Point a request at something that echoes headers, or check the proxy log:
 
 ```sh
-# expect: x-pi-session-id, x-pi-harness present; parent-session-id only on forked sessions
+# expect on every request: x-pi-session-id, x-pi-harness, x-pi-parent-state (root|child)
+# expect on children only:  x-pi-parent-session-id
+# sent but not yet persisted: x-pi-cwd, x-pi-session-name, x-pi-call-seq
 ```

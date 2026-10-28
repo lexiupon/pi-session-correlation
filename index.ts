@@ -18,7 +18,6 @@
  *   so a value that cannot be represented is skipped rather than guessed.
  */
 
-import { createHash } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ProviderHeaders } from "@earendil-works/pi-ai";
 
@@ -51,8 +50,13 @@ function setState(sessionId: string): { turnIndex: number; callSeq: number } | u
 
 /**
  * Set a header if the value is present, representable, and not already set.
- * Existing keys win: an explicit models.json header is a deliberate override.
+ * Existing keys win: an explicit models.json header is a deliberate override, and
+ * the proxy can no longer tell the two apart, so collisions are resolved here.
  * `ProviderHeaders` is `Record<string, string | null>`, where null means delete.
+ *
+ * A value that cannot be represented is NOT sent — per the RFC, the field reads null
+ * on the proxy side and the request counts as header-absent for coverage. Hashing
+ * oversized values is deferred along with `projectSlug`.
  */
 function put(headers: ProviderHeaders, name: string, value: string | undefined | null): void {
   if (!value) return;
@@ -60,24 +64,6 @@ function put(headers: ProviderHeaders, name: string, value: string | undefined |
   if (UNSAFE_VALUE_RE.test(value)) return;
   if (headers[name] !== undefined) return;
   headers[name] = value;
-}
-
-/**
- * Like `put`, but an oversized value becomes a marked hash instead of disappearing.
- * Used for the project dimension, where dropping it is the worst option: absence
- * already carries meaning elsewhere in this schema, so a silently missing cwd is
- * indistinguishable from "not applicable". The `sha256:` marker is mandatory — the
- * RFC requires hashed values to be distinguishable from literal ones — and the hash
- * is not reversible, so the proxy owns the value mapping.
- */
-function putStable(headers: ProviderHeaders, name: string, value: string | undefined | null): void {
-  if (!value) return;
-  if (headers[name] !== undefined) return;
-  if (value.length <= MAX_VALUE_LEN && !UNSAFE_VALUE_RE.test(value)) {
-    headers[name] = value;
-    return;
-  }
-  headers[name] = `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
 }
 
 /**
@@ -117,21 +103,26 @@ export default function (pi: ExtensionAPI) {
     put(headers, `${PREFIX}-session-id`, sessionId);
     put(headers, `${PREFIX}-harness`, "pi");
 
+    // Run-scoped: pi's turn counter restarts on reload and on resume, so this value
+    // is only stable within a process run. The RFC prefers a session-entry-id key
+    // once that is confirmed workable; until then this is the counter form.
     if (entry) {
       put(headers, `${PREFIX}-turn-id`, `${sessionId}:${entry.turnIndex}`);
       put(headers, `${PREFIX}-turn-index`, String(entry.turnIndex));
       put(headers, `${PREFIX}-call-seq`, String(entry.callSeq));
     }
 
-    // Lineage. pi records parentSession on the session header for forked and
-    // spawned sessions; a root session legitimately has none, so absence is
-    // meaningful and is left unset rather than written as an empty value.
+    // Lineage. pi records parentSession on the session header for forked and spawned
+    // sessions. State is sent explicitly on every request, so absence of the header
+    // means "no contract" rather than being overloaded onto root/child, and a child
+    // always carries an id.
     const parentSession = sm.getHeader?.()?.parentSession;
-    put(headers, `${PREFIX}-parent-session-id`, sessionIdFromPath(parentSession));
+    const parentSessionId = sessionIdFromPath(parentSession);
+    put(headers, `${PREFIX}-parent-state`, parentSession ? "child" : "root");
+    if (parentSessionId) put(headers, `${PREFIX}-parent-session-id`, parentSessionId);
 
-    // Project attribution. Hashed rather than dropped when a path is too long for
-    // a header value — deep worktree paths are exactly the ones that matter.
-    putStable(headers, `${PREFIX}-cwd`, ctx.cwd || sm.getCwd?.());
-    putStable(headers, `${PREFIX}-session-name`, sm.getSessionName?.());
+    // Deferred by the RFC (projectSlug follow-up): sent now, not persisted yet.
+    put(headers, `${PREFIX}-cwd`, ctx.cwd || sm.getCwd?.());
+    put(headers, `${PREFIX}-session-name`, sm.getSessionName?.());
   });
 }
