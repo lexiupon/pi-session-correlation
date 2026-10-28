@@ -63,11 +63,12 @@ function put(headers: ProviderHeaders, name: string, value: string | undefined |
 }
 
 /**
- * Like `put`, but an oversized value becomes a stable hash instead of disappearing.
+ * Like `put`, but an oversized value becomes a marked hash instead of disappearing.
  * Used for the project dimension, where dropping it is the worst option: absence
  * already carries meaning elsewhere in this schema, so a silently missing cwd is
- * indistinguishable from "not applicable". Hash the raw value so the dimension
- * stays joinable even when it is no longer human-readable.
+ * indistinguishable from "not applicable". The `sha256:` marker is mandatory — the
+ * RFC requires hashed values to be distinguishable from literal ones — and the hash
+ * is not reversible, so the proxy owns the value mapping.
  */
 function putStable(headers: ProviderHeaders, name: string, value: string | undefined | null): void {
   if (!value) return;
@@ -76,7 +77,7 @@ function putStable(headers: ProviderHeaders, name: string, value: string | undef
     headers[name] = value;
     return;
   }
-  headers[name] = createHash("sha256").update(value).digest("hex").slice(0, 16);
+  headers[name] = `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
 }
 
 /**

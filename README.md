@@ -4,7 +4,10 @@ Stamps session-correlation headers onto every model request pi sends, so a
 fronting proxy (loopia) can attribute a call to its session, turn, and parent
 session **without re-deriving them from prompt text**.
 
-Companion RFC: `loopia/docs/rfcs/session-correlation-headers.md`.
+Companion RFC: `loopia/docs/rfcs/session-correlation-headers.md`. **Header names here
+are provisional until that RFC's identity contract lands** — it now defines precedence
+(operator literal > this extension > session-affinity fallback > ingest derivation), so
+changing names is cheap now and expensive once anything depends on them.
 
 ## Why this exists
 
@@ -32,7 +35,7 @@ via the `models.json` path. Worth knowing before anything treats them as guarant
 | `x-pi-session-id` | `sessionManager.getSessionId()` | matches the id in the session file name |
 | `x-pi-turn-id` | `<session-id>:<turnIndex>` | **tool-loop granularity** — see caveat below |
 | `x-pi-turn-index` | `turn_start.turnIndex` | |
-| `x-pi-call-seq` | per-session counter | **best effort** — resets on extension reload, restart, or resume; ordering within one process run, not a durable sequence |
+| `x-pi-call-seq` | per-session counter | **advisory** — resets on extension reload, restart, or resume. The RFC dropped it as a persisted field (ordering is recoverable from `timestamp` + `requestId`); still emitted, nothing consumes it yet |
 | `x-pi-parent-session-id` | session header `parentSession` | id recovered from the parent path; absent for root sessions |
 | `x-pi-cwd` | `ctx.cwd` / `sessionManager.getCwd()` | the project dimension; **sha256 prefix if the path is too long for a header** |
 | `x-pi-session-name` | `sessionManager.getSessionName()` | set via `/name` / `--name`; hashed on overflow |
@@ -52,10 +55,12 @@ wins.
 - **Values that cannot be represented are skipped, not guessed**, for the short identifier
   fields.
 - **Oversized values are hashed, not dropped, where absence means something**
-  (`x-pi-cwd`, `x-pi-session-name`): beyond the cap or containing non-ASCII, they become a
-  stable sha256 prefix so the dimension stays joinable against a mapping table. Short
-  identifier fields are still skipped rather than mangled. Handler failures do not change
-  the provider response, so a dropped header degrades quietly either way.
+  (`x-pi-cwd`, `x-pi-session-name`): beyond the 200-char cap or containing non-ASCII, they
+  become `sha256:<first 16 hex>` of the raw value. The marker is required by the RFC so
+  hashed values stay distinguishable from literal ones, and because a hash is not
+  reversible, the **proxy** owns the value-mapping table — pi cannot. Short identifier
+  fields are still skipped rather than mangled. Handler failures do not change the
+  provider response, so a dropped header degrades quietly either way.
 - **State is keyed per session id**, because one pi process can host several concurrent
   sessions (in-process subagents). A module-global counter would mix them. It is also
   in-memory, so `callSeq` restarts after a reload, restart, or resume.
