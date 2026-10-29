@@ -13,7 +13,7 @@ proxy can only see the final value, so this extension is where collisions get de
 
 The proxy sees one HTTP request per model call and no session identity — pi sends
 none today. Session grouping currently has to be *inferred*, and exact prefix-tree
-chaining measurably fails (7 of 905 calls linked on a sampled day) because dynamic
+chaining measurably fails on our own traffic because dynamic
 blocks — task-list reminders, timestamps — are re-rendered into the prompt between
 calls and break byte-stable prefixes.
 

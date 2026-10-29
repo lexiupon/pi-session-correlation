@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 - README: dropped local filesystem paths and the pointer into a private repository; the install
   section now uses pi's documented install sources only. Docs-only — versioned so the copy in the
   published tarball matches the repository.
+- README: the internal sampling figure is stated qualitatively ("on our own traffic") instead of
+  as a measured count.
 
 ## [0.1.0] - 2026-10-29
 
