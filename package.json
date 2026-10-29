@@ -1,12 +1,48 @@
 {
-  "name": "pi-session-correlation",
+  "name": "@alexion42/pi-session-correlation",
   "version": "0.1.0",
   "description": "pi extension: stamp session/turn/parent-session correlation headers onto model requests for a fronting proxy.",
-  "private": true,
+  "author": "Alexion Fortytwo <alexion@lexiupon.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexion42/pi-session-correlation.git"
+  },
+  "homepage": "https://github.com/alexion42/pi-session-correlation#readme",
+  "bugs": {
+    "url": "https://github.com/alexion42/pi-session-correlation/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "session-correlation",
+    "tracing",
+    "observability",
+    "headers"
+  ],
   "type": "module",
-  "dependencies": {
-    "@earendil-works/pi-ai": "file:/Users/jiacao/.bun/install/global/node_modules/@earendil-works/pi-ai",
-    "@earendil-works/pi-coding-agent": "file:/Users/jiacao/.bun/install/global/node_modules/@earendil-works/pi-coding-agent"
+  "scripts": {
+    "pack:dry-run": "npm pack --dry-run"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "files": [
+    "extensions/**/*",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
     "typescript": "^6.0.3"

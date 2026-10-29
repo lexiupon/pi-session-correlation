@@ -70,15 +70,26 @@ wins.
 
 ## Install
 
-Pi loads extensions from the user or project extensions directory — direct `.ts`/`.js`
-files, or subdirectories with an `index.ts`/`index.js` entry point.
+From npm, once published:
 
 ```sh
-ln -s ~/projects/pi-extensions/pi-session-correlation ~/.pi/agent/extensions/pi-session-correlation
+pi install npm:@alexion42/pi-session-correlation
 ```
 
-Or add the package to `packages` in `~/.pi/agent/settings.json`. Then `/model` (or a
-restart) to reload.
+From git — this works because the package root is the repository root and the extension is
+declared under `pi.extensions`:
+
+```sh
+pi install git:github.com/alexion42/pi-session-correlation
+```
+
+Or link this checkout into the user extensions directory:
+
+```sh
+ln -s ~/projects2/pi-session-correlation ~/.pi/agent/extensions/pi-session-correlation
+```
+
+Then `/model` (or a restart) to reload.
 
 ## Verify
 
