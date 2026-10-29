@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
   `pi-extensions` repo. History preserved (7 commits), contents byte-identical.
 - Extension moved to `extensions/index.ts` and declared through the `pi` manifest, matching the
   layout of the sibling packages.
-- Renamed to `@alexion42/pi-session-correlation`; `private` dropped, `publishConfig.access` set.
+- Published under the `@lexiupon` scope as `@lexiupon/pi-session-correlation` (first release; `private` dropped, `publishConfig.access` set).
 - Host-provided packages (`@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`) moved from
   machine-local `file:` dependencies to `peerDependencies`, as pi requires of a published package.
 - Added `files` allowlist, `keywords` (incl. `pi-package`), MIT `LICENSE`, and this changelog.

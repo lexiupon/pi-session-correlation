@@ -1,16 +1,16 @@
 {
-  "name": "@alexion42/pi-session-correlation",
+  "name": "@lexiupon/pi-session-correlation",
   "version": "0.1.0",
   "description": "pi extension: stamp session/turn/parent-session correlation headers onto model requests for a fronting proxy.",
   "author": "Alexion Fortytwo <alexion@lexiupon.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/alexion42/pi-session-correlation.git"
+    "url": "git+https://github.com/lexiupon/pi-session-correlation.git"
   },
-  "homepage": "https://github.com/alexion42/pi-session-correlation#readme",
+  "homepage": "https://github.com/lexiupon/pi-session-correlation#readme",
   "bugs": {
-    "url": "https://github.com/alexion42/pi-session-correlation/issues"
+    "url": "https://github.com/lexiupon/pi-session-correlation/issues"
   },
   "keywords": [
     "pi-package",

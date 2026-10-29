@@ -73,14 +73,14 @@ wins.
 From npm, once published:
 
 ```sh
-pi install npm:@alexion42/pi-session-correlation
+pi install npm:@lexiupon/pi-session-correlation
 ```
 
 From git — this works because the package root is the repository root and the extension is
 declared under `pi.extensions`:
 
 ```sh
-pi install git:github.com/alexion42/pi-session-correlation
+pi install git:github.com/lexiupon/pi-session-correlation
 ```
 
 Or link this checkout into the user extensions directory:
