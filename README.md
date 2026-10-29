@@ -1,11 +1,11 @@
 # pi-session-correlation
 
 Stamps session-correlation headers onto every model request pi sends, so a
-fronting proxy (loopia) can attribute a call to its session, turn, and parent
+fronting proxy can attribute a call to its session, turn, and parent
 session **without re-deriving them from prompt text**.
 
-Companion RFC: `loopia/docs/rfcs/session-correlation-headers.md`. **Header names here
-are provisional until that RFC's wire contract lands.** The contract now assigns exactly
+The wire contract is defined by a companion RFC that is not public yet. **Header names here
+are provisional until it lands.** The contract now assigns exactly
 one canonical name per field and resolves any same-name collision **on the client** — the
 proxy can only see the final value, so this extension is where collisions get decided.
 
@@ -70,7 +70,7 @@ wins.
 
 ## Install
 
-From npm, once published:
+From npm:
 
 ```sh
 pi install npm:@lexiupon/pi-session-correlation
@@ -83,11 +83,13 @@ declared under `pi.extensions`:
 pi install git:github.com/lexiupon/pi-session-correlation
 ```
 
-Or link this checkout into the user extensions directory:
+Or point pi at a local checkout — it loads the extension from that path without copying:
 
 ```sh
-ln -s ~/projects2/pi-session-correlation ~/.pi/agent/extensions/pi-session-correlation
+pi install /path/to/pi-session-correlation
 ```
+
+(Relative paths resolve from the settings file that declares them.)
 
 Then `/model` (or a restart) to reload.
 

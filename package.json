@@ -1,6 +1,6 @@
 {
   "name": "@lexiupon/pi-session-correlation",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "pi extension: stamp session/turn/parent-session correlation headers onto model requests for a fronting proxy.",
   "author": "Alexion Fortytwo <alexion@lexiupon.com>",
   "license": "MIT",
