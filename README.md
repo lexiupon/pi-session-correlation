@@ -50,7 +50,7 @@ wins.
 
 ## Caveats worth knowing before you build on these
 
-- **The compound turn key is a client convention, not something the proxy verifies.** It stores `x-pi-turn-id` verbatim and never splits it; if it disagrees with the standalone `x-pi-session-id` / `x-pi-run-id` headers, that is counted as a mismatch and **not corrected**. So keep the components in their own headers — anything downstream that needs them must read those, not this value. Its delimiters may change without a contract change.
+- **The compound turn key is a client convention, and the consistency check is ours, not the proxy's.** The proxy stores `x-pi-turn-id` verbatim and never parses it — it validates `x-pi-session-id` and `x-pi-run-id` independently, and cannot detect a disagreement with the components embedded here. This extension mints all three from the same values (`sessionId`, the module-level `RUN_ID`, and the per-session `turnIndex`), so within it they agree by construction. If the key ever needs to be machine-read downstream, version the format first.
 - **`turnIndex` is pi turns, not human messages.** One assistant response that issues
   tool calls starts another turn. The run id makes the key unique per run, but it does not
   change the granularity — if you need "one human message", that is a different grain and a
