@@ -35,8 +35,8 @@ treats them as guaranteed.
 | Header | Source | Notes |
 |---|---|---|
 | `x-pi-session-id` | `sessionManager.getSessionId()` | matches the id in the session file name |
-| `x-pi-turn-id` | `<session-id>:<run-id>:<turn-index>` | run-scoped, and the run id is what makes that join-safe — the counter restarts on reload/resume, so the key is unique per run by construction. **Tool-loop granularity** — see caveat below |
-| `x-pi-run-id` | per-process nonce, minted at extension load | **extension-only**; a reload re-imports the module and mints a new one |
+| `x-pi-turn-id` | `<session-id>:<run-id>:<turn-index>` | run-scoped, and the run id is what keeps it join-safe across reloads and resumes. **The proxy stores this opaque and does not parse it** — see caveat below |
+| `x-pi-run-id` | per-process nonce (**UUIDv4**, via `randomUUID()`), minted at extension load | **extension-only**; a reload re-imports the module and mints a new one |
 | `x-pi-turn-index` | `turn_start.turnIndex` | |
 | `x-pi-call-seq` | per-session counter | **advisory** — resets on extension reload, restart, or resume. The RFC dropped it as a persisted field (ordering is recoverable from `timestamp` + `requestId`); still emitted, nothing consumes it yet |
 | `x-pi-parent-state` | session header `parentSession` | **`root` or `child`, sent on every request** — absence means "no contract", so state is never inferred from a missing header |
@@ -50,6 +50,7 @@ wins.
 
 ## Caveats worth knowing before you build on these
 
+- **The compound turn key is a client convention, not something the proxy verifies.** It stores `x-pi-turn-id` verbatim and never splits it; if it disagrees with the standalone `x-pi-session-id` / `x-pi-run-id` headers, that is counted as a mismatch and **not corrected**. So keep the components in their own headers — anything downstream that needs them must read those, not this value. Its delimiters may change without a contract change.
 - **`turnIndex` is pi turns, not human messages.** One assistant response that issues
   tool calls starts another turn. The run id makes the key unique per run, but it does not
   change the granularity — if you need "one human message", that is a different grain and a
